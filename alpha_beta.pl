@@ -16,16 +16,17 @@ next_state(Board, Player, Added, Index):-
 alpha_beta(Board, Player, Column):-
     Alpha = -10,
     Beta = 10,
-    findall([V,Column] , (next_state(Board, Player, Next, Column), min_value(Next, Player, Alpha, Beta, V)) , Choices),
-    column_of_choice(Choices,[V,Column]).
+    findall([V,Column, Steps] , (next_state(Board, Player, Next, Column), min_value(Next, Player, Alpha, Beta, 1, V,Steps)) , Choices),
+    column_of_choice(Choices,[V,Column, _]).
 
-column_of_choice([[V,Col]], [V,Col]):-!.
-column_of_choice([[V,Col]|T], Res):-
-    column_of_choice(T, [Rest_V, Rest_Col]),
-    (V > Rest_V ->
-        (Res = [V,Col], !)
-    ;
-        Res = [Rest_V,Rest_Col]
+column_of_choice([[V,Col, Steps]], [V,Col, Steps]):-!.
+column_of_choice([[V,Col, Steps]|T], Res):-
+    column_of_choice(T, [Rest_V, Rest_Col, Rest_Steps]),
+    (
+    ( V > Rest_V -> (Res = [V,Col, Steps], !));
+    ((V = Rest_V, V = 1) -> (Steps < Rest_Steps -> (Res = [V, Col, Steps]);Res = [Rest_V, Rest_Col, Rest_Steps]), !);
+    ((V = Rest_V, V = -1)-> (Steps >= Rest_Steps -> (Res = [V, Col, Steps]);Res = [Rest_V, Rest_Col, Rest_Steps], !));
+    (Res = [Rest_V,Rest_Col,Rest_Steps])
     ).
 
 
@@ -34,8 +35,9 @@ max_value(
     Player, %in
     _,      %in
     _,      %in
+    Steps,
     V       %out
-    ):-
+    , Steps):-
     measureState(Board, V, Player), V \= unKnown, !.
 
 max_value(
@@ -43,30 +45,35 @@ max_value(
     Player, %in
     Alpha,  %in
     Beta,   %in
-    V       %out
-    ):-
+    Steps,
+    V,       %out
+    StepsO):-
     measureState(Board, unKnown, Player),
     Local_V = -10, %there's no value less than -1 anyway, so -10 here represents -infinity
     findall(Next,next_state(Board, Player, Next,_),Children),
-    loop_over_children_min(Children, Player, Alpha, Beta, Local_V, V).
+    Steps2 is Steps + 1,
+    loop_over_children_min(Children, Player, Alpha, Beta, Local_V, Steps2, 49, StepsO, V).
 
 
-loop_over_children_min([], _, _,_, V, V) :- !.
-loop_over_children_min([H|T], Player, Alpha, Beta, V, V_Result) :-
-    min_value(H, Player, Alpha, Beta, V_dash),
-    max(V, V_dash, Max),
+loop_over_children_min([], _, _,_, V, _, Steps, Steps, V) :- !.
+loop_over_children_min([H|T], Player, Alpha, Beta, V, InitialSteps, BroSteps, Steps_Result, V_Result) :-
+    min_value(H, Player, Alpha, Beta, InitialSteps, V_dash, Steps_dash),
+    maxV(V, BroSteps, V_dash, Steps_dash, [Max, Shortest_Steps]),
     (
         V_dash >= Beta ->
-        (   V_Result = Max , !)
+        (   V_Result = Max , Steps_Result = Shortest_Steps,!)
         ;
         (
             max(Alpha, V_dash, New_alpha),
-            max(V, V_dash, New_v),
-            loop_over_children_min(T, Player, New_alpha, Beta, New_v, V_Result)
+            loop_over_children_min(T, Player, New_alpha, Beta, Max, InitialSteps, Shortest_Steps, Steps_Result, V_Result)
         )
     ).
-
-
+maxV(-1, S1, -1, S2, [-1, S]):-
+    S1 >= S2 -> (S = S1, !); S = S2, !.
+maxV(V1, S1, V2, S2, Res):-
+    V1 > V2 -> (Res = [V1, S1], !);
+    V1 = V2 -> (S1 < S2 -> (Res = [V1, S1], !) ; Res = [V2, S2], !);
+    Res = [V2, S2].
 max(N1,N2,Max):-
     (N1 >= N2 ->
         (Max = N1, !)
@@ -79,8 +86,9 @@ min_value(
     Player, %in
     _,      %in
     _,      %in
+    Steps,
     V       %out
-    ):-
+    , Steps):-
     measureState(Board, V, Player), V \= unKnown, !.
 
 min_value(
@@ -88,27 +96,34 @@ min_value(
     Player, %in
     Alpha,  %in
     Beta,   %in
-    V       %out
-    ):-
+    Steps,
+    V,       %out
+    StepsO):-
     measureState(Board, unKnown, Player),
-    Local_V = 10, %there's no value less than -1 anyway, so 10 here represents infinity
+    Local_V = -10, %there's no value less than -1 anyway, so -10 here represents -infinity
     findall(Next,next_state(Board, Player, Next,_),Children),
-    loop_over_children_max(Children, Player, Alpha, Beta, Local_V, V).
+    Steps2 is Steps + 1,
+    loop_over_children_max(Children, Player, Alpha, Beta, Local_V, Steps2, 49, StepsO, V).
 
-
-loop_over_children_max([], _, _, _, V, V) :- !.
-loop_over_children_max([H|T], Player, Alpha, Beta, V, V_Result) :-
-    max_value(H, Player, Alpha, Beta, V_dash),
-    min(V, V_dash, New_v),
+loop_over_children_max([], _, _,_, V, _, Steps, Steps, V) :- !.
+loop_over_children_max([H|T], Player, Alpha, Beta, V, InitialSteps, BroSteps, Steps_Result, V_Result) :-
+    max_value(H, Player, Alpha, Beta, InitialSteps, V_dash, Steps_dash),
+    minV(V, BroSteps, V_dash, Steps_dash, [New_v, Shortest_Steps]),
     (
         Alpha < V_dash ->
         (
             min(V_dash, Beta, New_beta),
-            loop_over_children_max(T, Player, Alpha, New_beta, New_v, V_Result), !
+            loop_over_children_max(T, Player, Alpha, New_beta, New_v,InitialSteps, Shortest_Steps, Steps_Result, V_Result), !
         )
         ;
-        V_Result = V
+        (V_Result = V, Steps_Result = BroSteps)
     ).
+minV(1, S1, 1, S2, [1, S]):-
+    S1 > S2 -> (S = S1, !); S = S2, !.
+minV(V1, S1, V2, S2, Res):-
+    V1 < V2 -> (Res = [V1, S1], !);
+    V1 = V2 -> (S1 < S2 -> (Res = [V1, S1], !) ; Res = [V2, S2], !);
+    Res = [V2, S2].
 
 min(N1,N2,Min):-
     ((N2 >= N1) ->

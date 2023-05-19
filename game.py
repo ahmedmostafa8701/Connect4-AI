@@ -14,7 +14,7 @@ def main():
 
     # Load the Prolog code file
     prolog.consult("alpha_beta.pl")
-    time.sleep(7)
+    time.sleep(4)
     game_end = False
     while not game_end:
         (game_board, game_end) = board.get_game_grid()
@@ -32,7 +32,7 @@ def main():
             break
         board.select_column(colomn)
 
-        time.sleep(4)
+        time.sleep(2)
 
 
 if __name__ == "__main__":
