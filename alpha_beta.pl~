@@ -82,7 +82,8 @@ min_value(
     V       %out
     ):-
     measureState(Board, V, Player), V \= unKnown, !.
-
+test(V, V2):-
+    print(V), V2 = V.
 min_value(
     Board,  %in
     Player, %in
@@ -93,7 +94,8 @@ min_value(
     measureState(Board, unKnown, Player),
     Local_V = 10, %there's no value less than -1 anyway, so 10 here represents infinity
     findall(Next,next_state(Board, Player, Next,_),Children),
-    loop_over_children_max(Children, Player, Alpha, Beta, Local_V, V).
+    loop_over_children_max(Children, Player, Alpha, Beta, Local_V, V),
+    test(V, V2).
 
 
 loop_over_children_max([], _, _, _, V, V) :- !.

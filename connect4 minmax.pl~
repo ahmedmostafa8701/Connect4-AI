@@ -1,124 +1,7 @@
 player(b).
 player(r).
-
 opositePlayer(r, b):-!.
 opositePlayer(b, r).
-
-next_state(Board, Player, Added, Index):-
-    (Index is 0, addPiece(Board, Index, Added, Player, _) , (Board\=Added));
-    (Index is 1, addPiece(Board, Index, Added, Player, _) , (Board\=Added));
-    (Index is 2, addPiece(Board, Index, Added, Player, _) , (Board\=Added));
-    (Index is 3, addPiece(Board, Index, Added, Player, _) , (Board\=Added));
-    (Index is 4, addPiece(Board, Index, Added, Player, _) , (Board\=Added));
-    (Index is 5, addPiece(Board, Index, Added, Player, _) , (Board\=Added));
-    (Index is 6, addPiece(Board, Index, Added, Player, _) , (Board\=Added)).
-
-alpha_beta(Board, Player, Column):-
-    Alpha = -10,
-    Beta = 10,
-    findall([V,Column] , (next_state(Board, Player, Next, Column), min_value(Next, Player, Alpha, Beta, V)) , Choices),
-    column_of_choice(Choices,[V,Column]).
-
-column_of_choice([[V,Col]], [V,Col]):-!.
-column_of_choice([[V,Col]|T], Res):-
-    column_of_choice(T, [Rest_V, Rest_Col]),
-    (V > Rest_V ->
-        (Res = [V,Col], !)
-    ;
-        Res = [Rest_V,Rest_Col]
-    ).
-
-
-max_value(
-    Board,  %in
-    Player, %in
-    _,      %in
-    _,      %in
-    V       %out
-    ):-
-    measureState(Board, V, Player), V \= unKnown, !.
-
-max_value(
-    Board,  %in
-    Player, %in
-    Alpha,  %in
-    Beta,   %in
-    V       %out
-    ):-
-    measureState(Board, unKnown, Player),
-    Local_V = -10, %there's no value less than -1 anyway, so -10 here represents -infinity
-    findall(Next,next_state(Board, Player, Next,_),Children),
-    loop_over_children_min(Children, Player, Alpha, Beta, Local_V, V).
-
-
-loop_over_children_min([], _, _,_, V, V) :- !.
-loop_over_children_min([H|T], Player, Alpha, Beta, V, V_Result) :-
-    min_value(H, Player, Alpha, Beta, V_dash),
-    max(V, V_dash, Max),
-    (
-        V_dash >= Beta ->
-        (   V_Result = Max , !)
-        ;
-        (
-            max(Alpha, V_dash, New_alpha),
-            max(V, V_dash, New_v),
-            loop_over_children_min(T, Player, New_alpha, Beta, New_v, V_Result)
-        )
-    ).
-
-
-max(N1,N2,Max):-
-    (N1 >= N2 ->
-        (Max = N1, !)
-    ;
-        (Max = N2)
-    ).
-
-min_value(
-    Board,  %in
-    Player, %in
-    _,      %in
-    _,      %in
-    V       %out
-    ):-
-    measureState(Board, V, Player), V \= unKnown, !.
-
-min_value(
-    Board,  %in
-    Player, %in
-    Alpha,  %in
-    Beta,   %in
-    V       %out
-    ):-
-    measureState(Board, unKnown, Player),
-    Local_V = 10, %there's no value less than -1 anyway, so 10 here represents infinity
-    findall(Next,next_state(Board, Player, Next,_),Children),
-    loop_over_children_max(Children, Player, Alpha, Beta, Local_V, V).
-
-
-loop_over_children_max([], _, _, _, V, V) :- !.
-loop_over_children_max([H|T], Player, Alpha, Beta, V, V_Result) :-
-    max_value(H, Player, Alpha, Beta, V_dash),
-    min(V, V_dash, New_v),
-    (
-        Alpha < V_dash ->
-        (
-            min(V_dash, Beta, New_beta),
-            loop_over_children_max(T, Player, Alpha, New_beta, New_v, V_Result), !
-        )
-        ;
-        V_Result = V
-    ).
-
-min(N1,N2,Min):-
-    ((N2 >= N1) ->
-        (Min = N1, !)
-    ;
-        Min = N2
-    ).
-
-
-
 minMax(Board, Colomn, Player):-
     minMaxHelper(Board, Player, 0, null, null, _, Colomn).
 minMaxHelper(_, _, Index, Score, Col, Score, Col):-
@@ -172,7 +55,7 @@ measureState(Board, Score, Player):-
     win(Board, Player1),
     player(Player1),
     ((Player1 = Player) -> (Score = 1, !);
-    Score = -1), !.
+    Score = -1, !).
 measureState(Board, Score, _):-
     fill(Board)->
     Score = 0, !.
@@ -245,9 +128,6 @@ transpose(Matrix, [Row|Rows]) :-
 first_column([], [], []):-!.
 first_column([[H|T]|Rows], [H|Hs], [T|Ts]) :-
     first_column(Rows, Hs, Ts).
-
-
-
 
 
 
