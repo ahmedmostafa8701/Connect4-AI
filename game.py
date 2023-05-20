@@ -32,7 +32,7 @@ def main():
             break
         board.select_column(colomn)
 
-        time.sleep(2)
+        time.sleep(4)
 
 
 if __name__ == "__main__":

@@ -16,64 +16,61 @@ next_state(Board, Player, Added, Index):-
 alpha_beta(Board, Player, Column):-
     Alpha = -10,
     Beta = 10,
-    findall([V,Column, Steps] , (next_state(Board, Player, Next, Column), min_value(Next, Player, Alpha, Beta, 1, V,Steps)) , Choices),
-    column_of_choice(Choices,[V,Column, _]).
-
+    findall([V,Column, Steps] , (next_state(Board, Player, Next, Column), min_value(Next, Player, Player, Alpha, Beta, 1, V,Steps)) , Choices),
+    column_of_choice(Choices,[_,Column, _]).
+column_of_choice([], [_, null, _]).
 column_of_choice([[V,Col, Steps]], [V,Col, Steps]):-!.
-column_of_choice([[V,Col, Steps]|T], Res):-
+column_of_choice([[V,Col, Steps]|T], [V_Res, Col_Res, Steps_Res]):-
     column_of_choice(T, [Rest_V, Rest_Col, Rest_Steps]),
-    (
-    ( V > Rest_V -> (Res = [V,Col, Steps], !));
-    ((V = Rest_V, V = 1) -> (Steps < Rest_Steps -> (Res = [V, Col, Steps]);Res = [Rest_V, Rest_Col, Rest_Steps]), !);
-    ((V = Rest_V, V = -1)-> (Steps >= Rest_Steps -> (Res = [V, Col, Steps]);Res = [Rest_V, Rest_Col, Rest_Steps], !));
-    (Res = [Rest_V,Rest_Col])
-    ).
+    best(V, Col, Steps, Rest_V,Rest_Col, Rest_Steps, V_Res, Col_Res, Steps_Res).
 
 
 max_value(
     Board,  %in
     Player, %in
+    _,
     _,      %in
     _,      %in
     Steps,
     V       %out
     , Steps):-
-    measureState(Board, V, Player), V \= unKnown, !.
+    count(Board, Player, V), status(V, Status), ((Status \= unKnown, !);fill(Board)), !.
 
 max_value(
     Board,  %in
     Player, %in
+    Player2,
     Alpha,  %in
     Beta,   %in
     Steps,
     V,       %out
     StepsO):-
-    measureState(Board, unKnown, Player),
-    Local_V = -10, %there's no value less than -1 anyway, so -10 here represents -infinity
-    findall(Next,next_state(Board, Player, Next,_),Children),
+    opositePlayer(Player2, Player3),
+    findall(Next,next_state(Board, Player3, Next,_),Children),
     Steps2 is Steps + 1,
-    loop_over_children_min(Children, Player, Alpha, Beta, Local_V, Steps2, 49, StepsO, V).
+    loop_over_children_min(Children, Player, Player2, Alpha, Beta, [n, n], Steps2, n, StepsO, V), !.
+max_value(Board, Player, _, _, _, S, V, S):-
+    count(Board, Player, V).
 
-
-loop_over_children_min([], _, _,_, V, _, Steps, Steps, V) :- !.
-loop_over_children_min([H|T], Player, Alpha, Beta, V, InitialSteps, BroSteps, Steps_Result, V_Result) :-
-    min_value(H, Player, Alpha, Beta, InitialSteps, V_dash, Steps_dash),
-    maxV(V, BroSteps, V_dash, Steps_dash, [Max, Shortest_Steps]),
+loop_over_children_min([], _, _,  _,_, V, _, Steps, Steps, V) :- !.
+loop_over_children_min([H|T], Player, Player2, Alpha, Beta, [Me, Op], InitialSteps, BroSteps, Steps_Result, V_Result) :-
+    min_value(H, Player, Player2, Alpha, Beta, InitialSteps, [Me2, Op2], Steps_dash),
+    best([Me, Op], _, BroSteps, [Me2, Op2], _, Steps_dash, [Me, Op], _, Shortest_Steps),
+    getV([Me, Op], V_dash),
     (
         V_dash >= Beta ->
-        (   V_Result = Max , Steps_Result = Shortest_Steps,!)
+        (   V_Result = [Me, Op] , Steps_Result = Shortest_Steps,!)
         ;
         (
             max(Alpha, V_dash, New_alpha),
-            loop_over_children_min(T, Player, New_alpha, Beta, Max, InitialSteps, Shortest_Steps, Steps_Result, V_Result)
+            loop_over_children_min(T, Player, Player2, New_alpha, Beta, [Me, Op], InitialSteps, Shortest_Steps, Steps_Result, V_Result)
         )
     ).
-maxV(-1, S1, -1, S2, [-1, S]):-
-    S1 >= S2 -> (S = S1, !); S = S2, !.
-maxV(V1, S1, V2, S2, Res):-
-    V1 > V2 -> (Res = [V1, S1], !);
-    V1 = V2 -> (S1 < S2 -> (Res = [V1, S1], !) ; Res = [V2, S2], !);
-    Res = [V2, S2].
+
+getV([[ScoreMe, N_me], [ScoreOp, N_op]], V):-
+    V1 = ScoreMe - ScoreOp,
+    (status([[ScoreMe, N_me], [ScoreOp, N_op]], Status),
+    (Status = win -> V is (V1 + 4), !);(Status = lose -> V is (V1 - 4), !); V = V1).
 max(N1,N2,Max):-
     (N1 >= N2 ->
         (Max = N1, !)
@@ -84,46 +81,76 @@ max(N1,N2,Max):-
 min_value(
     Board,  %in
     Player, %in
+    _,
     _,      %in
     _,      %in
     Steps,
     V       %out
     , Steps):-
-    measureState(Board, V, Player), V \= unKnown, !.
+    count(Board, Player, V), status(V, Status), ((Status \= unKnown, !);fill(Board)), !.
 
 min_value(
     Board,  %in
     Player, %in
+    Player2,
     Alpha,  %in
     Beta,   %in
     Steps,
     V,       %out
     StepsO):-
-    measureState(Board, unKnown, Player),
-    Local_V = -10, %there's no value less than -1 anyway, so -10 here represents -infinity
-    findall(Next,next_state(Board, Player, Next,_),Children),
+    opositePlayer(Player2, Player3),
+    findall(Next,next_state(Board, Player3, Next,_),Children),
     Steps2 is Steps + 1,
-    loop_over_children_max(Children, Player, Alpha, Beta, Local_V, Steps2, 49, StepsO, V).
-
-loop_over_children_max([], _, _,_, V, _, Steps, Steps, V) :- !.
-loop_over_children_max([H|T], Player, Alpha, Beta, V, InitialSteps, BroSteps, Steps_Result, V_Result) :-
-    max_value(H, Player, Alpha, Beta, InitialSteps, V_dash, Steps_dash),
-    minV(V, BroSteps, V_dash, Steps_dash, [New_v, Shortest_Steps]),
+    loop_over_children_max(Children, Player, Player2, Alpha, Beta, [n, n], Steps2, n, StepsO, V), !.
+min_value(Board, Player, _, _, _, S, V, S):-
+    count(Board, Player, V).
+loop_over_children_max([], _, _,_, _, V, _, Steps, Steps, V) :- !.
+loop_over_children_max([H|T], Player, Player2, Alpha, Beta, [Me1, Op1], InitialSteps, BroSteps, Steps_Result, V_Result) :-
+    max_value(H, Player, Player2, Alpha, Beta, InitialSteps, V_dash, Steps_dash),
+    best([Op1, Me1], _, BroSteps, V_dash, _, Steps_dash, [Op, Me], _, Shortest_Steps),
+    getV([Me, Op], V2)
+    ,getV(V_dash, V),
     (
-        Alpha < V_dash ->
+        Alpha < V ->
         (
-            min(V_dash, Beta, New_beta),
-            loop_over_children_max(T, Player, Alpha, New_beta, New_v,InitialSteps, Shortest_Steps, Steps_Result, V_Result), !
+            min(V2, Beta, New_beta),
+            loop_over_children_max(T, Player, Player2, Alpha, New_beta, [Me, Op],InitialSteps, Shortest_Steps, Steps_Result, V_Result), !
         )
         ;
-        (V_Result = V, Steps_Result = BroSteps)
+        (V_Result = [Me, Op], Steps_Result = BroSteps)
     ).
-minV(1, S1, 1, S2, [1, S]):-
-    S1 > S2 -> (S = S1, !); S = S2, !.
-minV(V1, S1, V2, S2, Res):-
-    V1 < V2 -> (Res = [V1, S1], !);
-    V1 = V2 -> (S1 < S2 -> (Res = [V1, S1], !) ; Res = [V2, S2], !);
-    Res = [V2, S2].
+best([n,n], _, _, Score, Col, Steps, Score, Col, Steps).
+best([[ScoreMe1, N_me1], [ScoreOp1, N_op1]], Col1, Steps1,[[ScoreMe2, N_me2], [ScoreOp2, N_op2]], Col2, Steps2, Score, Col, Steps ):-
+    ((ScoreMe1 >= 4, ScoreMe2 < 4) -> (Score = [[ScoreMe1, N_me1], [ScoreOp1, N_op1]], Col = Col1, Steps = Steps1, !));
+    ((ScoreMe2 >= 4, ScoreMe1 < 4) -> (Score = [[ScoreMe2, N_me2], [ScoreOp2, N_op2]], Col = Col2, Steps = Steps2, !));
+    ((ScoreOp2 >= 4, ScoreOp1 < 4) -> (Score = [[ScoreMe1, N_me1], [ScoreOp1, N_op1]], Col = Col1, Steps = Steps1, !));
+    ((ScoreOp1 >= 4, ScoreOp2 < 4) -> (Score = [[ScoreMe2, N_me2], [ScoreOp2, N_op2]], Col = Col2, Steps = Steps2, !));
+    ((ScoreMe1 >= 4, ScoreMe2 >= 4) -> (Steps2 < Steps1 ->
+                                     (Score = [[ScoreMe2, N_me2], [ScoreOp2, N_op2]], Col = Col2, Steps = Steps2, !);
+                                     (Score = [[ScoreMe1, N_me1], [ScoreOp1, N_op1]], Col = Col1, Steps = Steps1)
+                                     ), !
+    );
+    ((ScoreOp1 >= 4, ScoreOp2 >= 4) -> (Steps2 >= Steps1 ->
+                                     (Score = [[ScoreMe2, N_me2], [ScoreOp2, N_op2]], Col = Col2, Steps = Steps2, !);
+                                     (Score = [[ScoreMe1, N_me1], [ScoreOp1, N_op1]], Col = Col1, Steps = Steps1)
+                                     ), !
+    ).
+best([[ScoreMe1, N_me1], [ScoreOp1, N_op1]], Col1, Steps1, [[ScoreMe2, N_me2], [ScoreOp2, N_op2]], Col2, Steps2, Score, Col, Steps ):-
+    Diff1 is (ScoreMe1 - ScoreOp1), Diff2 is (ScoreMe2 - ScoreOp2),
+    (
+    (Diff1 > Diff2 -> (Score = [[ScoreMe1, N_me1], [ScoreOp1, N_op1]], Col = Col1, Steps = Steps1), !);
+    (Diff1 = Diff2 -> (Diff3 is (N_me1 - N_op1), Diff4 is (N_me2 - N_op2),
+                      (
+                      (Diff3 > Diff4 -> Score = [[ScoreMe1, N_me1], [ScoreOp1, N_op1]], Col = Col1, Steps = Steps1, !);
+                      (Diff3 < Diff4 -> Score = [[ScoreMe2, N_me2], [ScoreOp2, N_op2]], Col = Col2, Steps = Steps2, !);
+                      (Steps1 < Steps2 ->
+                      (Score = [[ScoreMe1, N_me1], [ScoreOp1, N_op1]], Col = Col1, Steps = Steps1, !));
+                      (Score = [[ScoreMe2, N_me2], [ScoreOp2, N_op2]], Col = Col2, Steps = Steps2, !)
+                      )
+                      )
+    )
+    );
+    Score = [[ScoreMe2, N_me2], [ScoreOp2, N_op2]], Col = Col2, Steps = Steps2.
 
 min(N1,N2,Min):-
     ((N2 >= N1) ->
@@ -133,41 +160,53 @@ min(N1,N2,Min):-
     ).
 
 
+count(Board, Player, [[Max, N], [Op_Max, Op_N]]):-
+    countHelper(Board, Player, -100, Max1, 0, N1),
+    transpose(Board, Trans),
+    countHelper(Trans, Player, Max1, Max, N1, N),
+    opositePlayer(Player, Op),
+    countHelper(Board, Op, -100, Max2, 0, N2),
+    transpose(Board, Trans),
+    countHelper(Trans, Op, Max2, Op_Max, N2, Op_N).
+countHelper([R|Remain], Player, Max1, Max, N1, N):-
+    countRow(R, Remain, Player, 0, Max1, Max2, N1, N2),
+    countHelper(Remain, Player, Max2, Max, N2, N).
+countHelper([], _, M, M, N, N).
+countRow([H|T], Remain, H, Index, Max1, Max, N1, N):-
+    countH(T, H, 1, C1),
+    countD(H, Index, Remain, 1, 1, C2),
+    countD(H, Index, Remain, -1, 1, C3),
+    Index2 is Index + 1,
+    getMax([C1, C2, C3], Max1, Max2, N1, N2),
+    countRow(T, Remain, H, Index2, Max2, Max, N2, N), !.
+countRow([_|T], Remain, Player, Index, Max1, Max, N1, N):-
+    Index2 is Index + 1,
+    countRow(T, Remain, Player, Index2, Max1, Max, N1, N), !.
+countRow([], _, _, _, Max, Max, N, N).
+getMax([H|T], Max1, Max, N1, N):-
+    (
+    (H > Max1 -> (Max2 = H, N2 = 1), !);
+    (Max1 > H -> (Max2 = Max1, N2 = 1), !);
+    (Max2 = H, N2 is N1 + 1)
+    ),
+    getMax(T, Max2, Max, N2, N).
+getMax([], Max, Max, N, N).
+countH([H|T], H, C, Res):-
+    player(H), C2 is C + 1, countH(T, H, C2, Res), !.
+countH(_, _, Res, Res).
 
-minMax(Board, Colomn, Player):-
-    minMaxHelper(Board, Player, 0, null, null, _, Colomn).
-minMaxHelper(_, _, Index, Score, Col, Score, Col):-
-    Index > 6, !.
-minMaxHelper(Board, Player, Index, PScore, PCol, Score, Colomn):-
-    addPiece(Board, Index, Added, Player, _),
-    Index2 is Index + 1,
-    Added = Board -> (minMaxHelper(Board, Player, Index2, PScore, PCol, Score, Colomn)),!.
-minMaxHelper(Board, Player, Index, PScore, PCol, Score, Colomn):-
-    addPiece(Board, Index, Added, Player, _),
-    measureState(Added, Score1, Player),
-    Score1 = unKnown,
-    opositePlayer(Player, Player2),
-    minMaxHelper(Added, Player2, 0, null, null, ScoreOp, _),
-    Score2 is (ScoreOp * -1),
-    best(PScore, PCol, Score2, Index, Score3, Col3),
-    Index2 is Index + 1,
-    minMaxHelper(Board, Player, Index2, Score3, Col3, Score, Colomn),!.
-minMaxHelper(Board, Player, Index, PScore, PCol, Score, Colomn):-
-    addPiece(Board, Index, Added, Player, _),
-    measureState(Added, Score1, Player),
-    Score1 \= unKnown,
-    best(PScore, PCol, Score1, Index, Score3, Col3),
-    Index2 is Index + 1,
-    (Score1 \= 1 -> (minMaxHelper(Board, Player, Index2, Score3, Col3, Score, Colomn), !);(Score = 1, Colomn = Index)).
-best(Score1, _, Score2, Col2, Score, Col):-
-    Score1 = null, Score = Score2, Col = Col2, !.
-best(Score1, Col1, Score2, _, Score, Col):-
-    Score2 = null, Score = Score1, Col = Col1, !.
-best(Score1, _, Score2, Col2, Score, Col):-
-    Score2 > Score1, Score = Score2, Col = Col2, !.
-best(Score1, Col1, Score2, _, Score, Col):-
-    Score1 > Score2, Score = Score1, Col = Col1, !.
-best(Score, Col, Score, _, Score, Col).
+countD(Player, Index, [Row|T], Change, Count, Res):-
+    Tar is Index + Change,
+    getInRow(Row, 0, Tar, Player),
+    Count2 is Count + 1,
+    countD(Player, Tar, T, Change, Count2, Res), !.
+countD(_, _, _, _, Res, Res).
+
+status([[S, _],[_, _]], win):- S >= 4, !.
+status([[_, _], [S, _]], lose):- S >= 4, !.
+status(_,  unKnown).
+
+
 addPiece(Board, Row, Added, Color, Last):-
    addPieceHelper(Board, Row, 0, Added, Color, Last).
 addPieceHelper([H|T], Row, Index, [H|T2], Color, Last):-
@@ -183,66 +222,11 @@ addToRow([w|T], Color, w,[Updated|T2]):-
 addToRow([H|T], Color, Color, [H|T]).
 addToRow([], Color, Color, []).
 
-measureState(Board, Score, Player):-
-    win(Board, Player1),
-    player(Player1),
-    ((Player1 = Player) -> (Score = 1, !);
-    Score = -1), !.
-measureState(Board, Score, _):-
-    fill(Board)->
-    Score = 0, !.
-measureState(_, unKnown, _).
-
-win(Board, Player):-
-    (winD(Board, Player1), player(Player1),Player = Player1, !);
-    (winH(Board, Player1), player(Player1),Player = Player1, !);
-    (winV(Board, Player1), player(Player1),Player = Player1).
-winH([H|T], Player):-
-    (winHRow(H, Player1), player(Player1),Player = Player1, !);
-    winH(T, Player).
-winH([], f).
-winHRow([Player, Player, Player, Player|_], Player1):-
-    player(Player), Player1 = Player,!.
-winHRow([_|T], Player):-
-    winHRow(T, Player).
-winHRow([], f).
-winV(Board, Player):-
-    transpose(Board, Trans),
-    winH(Trans, Player).
-winD([H|T], Player):-
-    winDRow(H, T,  Player1, 0), player(Player1) -> (Player = Player1);
-    winD(T, Player).
-winD([], f).
-winDRow([H|_], Remain, Player, Index):-
-    player(H),
-    winDHelper(H, Remain, Player1, 1, Index, 1),
-    player(Player1),
-    Player = Player1,!.
-winDRow([H|_], Remain, Player, Index):-
-    player(H),
-    winDHelper(H, Remain, Player1, 1, Index, -1),
-    player(Player1),
-    Player = Player1, !.
-winDRow([w|T], Remain, Player, Index):-
-    Index2 is Index + 1,
-    winDRow(T, Remain, Player, Index2), !.
-winDRow(_, _, f, _).
-winDHelper(Color, _, Color, 4, _, _):-!.
-winDHelper(Color, [H|T], Player, Count, Index, Change):-
-    (Tar is Index + Change,
-    (Tar > -1 , Tar < 6) ->
-    (getInRow(H, 0, Tar, Color2),
-    Color2 = Color,
-    Count2 is Count + 1,
-    winDHelper(Color, T, Player, Count2, Tar, Change), !);
-    Player = f),!.
-winDHelper(_, [], f, _, _, _).
 getInRow([Color|_], I, Tar, Color):-
     I = Tar, !.
 getInRow([_|T], I, Tar, Color):-
     I2 is I + 1,
     getInRow(T, I2, Tar, Color).
-% all winner in this row
 fill([H|T]):-
     fillRow(H),
     fill(T).
