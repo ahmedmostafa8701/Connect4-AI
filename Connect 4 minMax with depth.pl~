@@ -83,13 +83,6 @@ addToRow([w|T], Color, w,[Updated|T2]):-
     !.
 addToRow([H|T], Color, Color, [H|T]).
 addToRow([], Color, Color, []).
-
-getInRow([Color|_], I, Tar, Color):-
-    I = Tar, !.
-getInRow([_|T], I, Tar, Color):-
-    I2 is I + 1,
-    getInRow(T, I2, Tar, Color).
-
 fill([H|T]):-
     fillRow(H),
     fill(T).
