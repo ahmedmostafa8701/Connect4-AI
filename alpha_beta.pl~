@@ -106,10 +106,10 @@ min_value(Board, Player, _, _, _, S, V, S):-
     count(Board, Player, V).
 loop_over_children_max([], _, _,_, _, V, _, Steps, Steps, V) :- !.
 loop_over_children_max([H|T], Player, Player2, Alpha, Beta, [Me1, Op1], InitialSteps, BroSteps, Steps_Result, V_Result) :-
-    max_value(H, Player, Player2, Alpha, Beta, InitialSteps, [Me2, Op2], Steps_dash),
-    best([Op1, Me1], _, BroSteps, [Op2, Me2], _, Steps_dash, [Op, Me], _, Shortest_Steps),
+    max_value(H, Player, Player2, Alpha, Beta, InitialSteps, V_dash, Steps_dash),
+    best([Op1, Me1], _, BroSteps, V_dash, _, Steps_dash, [Op, Me], _, Shortest_Steps),
     getV([Me, Op], V2)
-    ,getV([Me2, Op2], V),
+    ,getV(V_dash, V),
     (
         Alpha < V ->
         (
