@@ -83,13 +83,66 @@ addToRow([w|T], Color, w,[Updated|T2]):-
     !.
 addToRow([H|T], Color, Color, [H|T]).
 addToRow([], Color, Color, []).
+measureState(Board, Score, Player):-
+    win(Board, Player1),
+    player(Player1),
+    ((Player1 = Player) -> (Score = 1, !);
+    Score = -1, !).
+measureState(Board, Score, _):-
+    fill(Board)->
+    Score = 0, !.
+measureState(_, unKnown, _).
 
+win(Board, Player):-
+    (winD(Board, Player1), player(Player1),Player = Player1, !);
+    (winH(Board, Player1), player(Player1),Player = Player1, !);
+    (winV(Board, Player1), player(Player1),Player = Player1).
+winH([H|T], Player):-
+    (winHRow(H, Player1), player(Player1),Player = Player1, !);
+    winH(T, Player).
+winH([], f).
+winHRow([Player, Player, Player, Player|_], Player1):-
+    player(Player), Player1 = Player,!.
+winHRow([_|T], Player):-
+    winHRow(T, Player).
+winHRow([], f).
+winV(Board, Player):-
+    transpose(Board, Trans),
+    winH(Trans, Player).
+winD([H|T], Player):-
+    winDRow(H, T,  Player1, 0), player(Player1) -> (Player = Player1);
+    winD(T, Player).
+winD([], f).
+winDRow([H|_], Remain, Player, Index):-
+    player(H),
+    winDHelper(H, Remain, Player1, 1, Index, 1),
+    player(Player1),
+    Player = Player1,!.
+winDRow([H|_], Remain, Player, Index):-
+    player(H),
+    winDHelper(H, Remain, Player1, 1, Index, -1),
+    player(Player1),
+    Player = Player1, !.
+winDRow([w|T], Remain, Player, Index):-
+    Index2 is Index + 1,
+    winDRow(T, Remain, Player, Index2), !.
+winDRow(_, _, f, _).
+winDHelper(Color, _, Color, 4, _, _):-!.
+winDHelper(Color, [H|T], Player, Count, Index, Change):-
+    (Tar is Index + Change,
+    (Tar > -1 , Tar < 6) ->
+    (getInRow(H, 0, Tar, Color2),
+    Color2 = Color,
+    Count2 is Count + 1,
+    winDHelper(Color, T, Player, Count2, Tar, Change), !);
+    Player = f),!.
+winDHelper(_, [], f, _, _, _).
 getInRow([Color|_], I, Tar, Color):-
     I = Tar, !.
 getInRow([_|T], I, Tar, Color):-
     I2 is I + 1,
     getInRow(T, I2, Tar, Color).
-
+% all winner in this row
 fill([H|T]):-
     fillRow(H),
     fill(T).
